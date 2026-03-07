@@ -1,0 +1,66 @@
+module Test.File exposing (main, tests)
+
+import Basics exposing (..)
+import File exposing (File)
+import Test exposing (..)
+import Expect
+import Json.Decode as Decode
+
+
+main : Test
+main =
+    tests
+
+
+tests : Test
+tests =
+    describe "File Tests"
+        [ decoderTests
+        ]
+
+
+
+-- DECODER TESTS
+-- File objects are browser-only, so we test the decoder's error behavior
+-- with non-File values.
+
+
+decoderTests : Test
+decoderTests =
+    describe "File.decoder"
+        [ test "rejects string" <|
+            \() ->
+                case Decode.decodeString File.decoder "\"hello\"" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err _ ->
+                        Expect.pass
+        , test "rejects number" <|
+            \() ->
+                case Decode.decodeString File.decoder "42" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err _ ->
+                        Expect.pass
+        , test "rejects null" <|
+            \() ->
+                case Decode.decodeString File.decoder "null" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err _ ->
+                        Expect.pass
+        , test "rejects boolean" <|
+            \() ->
+                case Decode.decodeString File.decoder "true" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err _ ->
+                        Expect.pass
+        , test "rejects object" <|
+            \() ->
+                case Decode.decodeString File.decoder "{}" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err _ ->
+                        Expect.pass
+        ]
