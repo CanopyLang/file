@@ -33,6 +33,7 @@ before exposing a `Task` API for things.
 
 
 import Bytes exposing (Bytes)
+import Capability exposing (UserActivated(..))
 import File exposing (File)
 import Json.Decode as Decode
 import Task exposing (Task)
@@ -69,8 +70,8 @@ event, like clicking something.
 reliably detect `Cancel` clicks across browsers. More about that in the
 section on [limitations](#limitations) below.
 -}
-file : List String -> (File -> msg) -> Cmd msg
-file mimes toMsg =
+file : UserActivated -> List String -> (File -> msg) -> Cmd msg
+file _ mimes toMsg =
   Task.perform toMsg (FileFFI.uploadOne mimes)
 
 
@@ -105,8 +106,8 @@ event, like clicking something.
 reliably detect `Cancel` clicks across browsers. More about that in the
 section on [limitations](#limitations) below.
 -}
-files : List String -> (File -> List File -> msg) -> Cmd msg
-files mimes toMsg =
+files : UserActivated -> List String -> (File -> List File -> msg) -> Cmd msg
+files _ mimes toMsg =
   Task.perform
     (\(f,fs) -> toMsg f fs)
     (FileFFI.uploadOneOrMore mimes)

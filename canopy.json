@@ -3,7 +3,7 @@
     "name": "canopy/file",
     "summary": "Select files. Download files. Work with file content.",
     "license": "BSD-3-Clause",
-    "version": "1.0.5",
+    "version": "2.0.0",
     "exposed-modules": [
         "File",
         "File.Select",
@@ -14,9 +14,10 @@
         "canopy/bytes": "1.0.0 <= v < 2.0.0",
         "canopy/core": "1.0.1 <= v < 2.0.0",
         "canopy/json": "1.1.0 <= v < 2.0.0",
-        "canopy/time": "1.0.0 <= v < 2.0.0"
+        "canopy/time": "1.0.0 <= v < 2.0.0",
+        "canopy/capability": "2.0.0 <= v < 3.0.0"
     },
     "test-dependencies": {
-        "canopy/test": "1.0.0 <= v < 2.0.0"
+        "canopy/test": "1.0.0 <= v < 3.0.0"
     }
 }
