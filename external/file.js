@@ -83,18 +83,28 @@ var _File_downloadNode;
 
 /**
  * Get or create the cached anchor element for downloads.
+ * The element is styled to be invisible and appended to the document body
+ * so that iOS Safari will honour programmatic clicks on it.
  * @returns {HTMLAnchorElement} A reusable anchor element
  */
 function _File_getDownloadNode()
 {
-	return _File_downloadNode || (_File_downloadNode = document.createElement('a'));
+	if (!_File_downloadNode)
+	{
+		_File_downloadNode = document.createElement('a');
+		_File_downloadNode.style.display = 'none';
+		document.body.appendChild(_File_downloadNode);
+	}
+	return _File_downloadNode;
 }
 
 /**
  * Download content as a file with the given name and MIME type.
  * Creates a Blob from the content, generates an object URL, and triggers
- * a download via a hidden anchor element click. Includes a fallback for
- * IE10+ using navigator.msSaveOrOpenBlob.
+ * a download via a hidden anchor element click.
+ *
+ * On iOS Safari the object URL is revoked after a short delay so the
+ * browser has time to begin the download before the URL is invalidated.
  * @canopy-type String -> String -> a -> b
  * @name download
  * @param {string} name - The file name for the download
@@ -108,20 +118,17 @@ var download = F3(function(name, mime, content)
 	{
 		var blob = new Blob([content], {type: mime});
 
-		// for IE10+
-		if (navigator.msSaveOrOpenBlob)
-		{
-			navigator.msSaveOrOpenBlob(blob, name);
-			return;
-		}
-
-		// for HTML5
 		var node = _File_getDownloadNode();
 		var objectUrl = URL.createObjectURL(blob);
 		node.href = objectUrl;
 		node.download = name;
 		_File_click(node);
-		URL.revokeObjectURL(objectUrl);
+
+		// Delay revocation so iOS Safari has time to initiate the download.
+		// Synchronous revocation causes the download to silently fail on iOS.
+		setTimeout(function() { URL.revokeObjectURL(objectUrl); }, 1000);
+
+		callback(_Scheduler_succeed(_Utils_Tuple0));
 	});
 });
 
@@ -143,17 +150,18 @@ function downloadUrl(href)
 		node.download = '';
 		node.origin === location.origin || (node.target = '_blank');
 		_File_click(node);
+
+		callback(_Scheduler_succeed(_Utils_Tuple0));
 	});
 }
 
 
-// IE COMPATIBILITY
+// BLOB COMPATIBILITY
 
 /**
- * Convert Bytes to a Uint8Array for IE10/IE11 compatibility.
- * IE cannot create a Blob directly from a DataView, so this extracts
- * the underlying buffer as a Uint8Array first.
- * See: https://github.com/elm/file/issues/10
+ * Convert Bytes to a Uint8Array for broad browser compatibility.
+ * Some browsers cannot create a Blob directly from a DataView, so this
+ * extracts the underlying buffer as a Uint8Array first.
  * @canopy-type Bytes -> a
  * @name makeBytesSafeForInternetExplorer
  * @param {DataView} bytes - A DataView representing Bytes
@@ -165,24 +173,24 @@ function makeBytesSafeForInternetExplorer(bytes)
 }
 
 /**
- * Simulate a click event on a DOM node. Uses the modern MouseEvent
- * constructor when available, falling back to the deprecated
- * document.createEvent / initMouseEvent API for IE10/IE11.
- * See: https://github.com/elm/file/issues/11
+ * Simulate a click event on a DOM node. The element is temporarily
+ * appended to the document body (if not already attached) so that
+ * iOS Safari honours the programmatic click. Without a DOM-attached
+ * element, iOS Safari silently ignores dispatchEvent on file inputs
+ * and anchor elements.
  * @param {HTMLElement} node - The DOM element to click
  */
 function _File_click(node)
 {
-	if (typeof MouseEvent === 'function')
+	var needsAttach = !node.parentNode;
+	if (needsAttach)
 	{
-		node.dispatchEvent(new MouseEvent('click'));
-	}
-	else
-	{
-		var event = document.createEvent('MouseEvents');
-		event.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+		node.style.display = 'none';
 		document.body.appendChild(node);
-		node.dispatchEvent(event);
+	}
+	node.dispatchEvent(new MouseEvent('click'));
+	if (needsAttach)
+	{
 		document.body.removeChild(node);
 	}
 }
@@ -191,15 +199,14 @@ function _File_click(node)
 // UPLOAD
 
 /**
- * Cached input element used for file selection dialogs.
- */
-var _File_node;
-
-/**
  * Open a file selection dialog for choosing a single file.
  * Creates a hidden file input element, sets the accepted MIME types,
  * and triggers a click to open the browser's file picker. Resolves
  * with the selected File when the user makes a selection.
+ *
+ * The input element is appended to the document body while the dialog
+ * is open because iOS Safari ignores programmatic clicks on detached
+ * file inputs.
  * @canopy-type List String -> a
  * @name uploadOne
  * @param {Object} mimes - A Canopy List of MIME type strings
@@ -209,14 +216,17 @@ function uploadOne(mimes)
 {
 	return _Scheduler_binding(function(callback)
 	{
-		_File_node = document.createElement('input');
-		_File_node.type = 'file';
-		_File_node.accept = _List_toArray(mimes).join(',');
-		_File_node.addEventListener('change', function(event)
+		var node = document.createElement('input');
+		node.type = 'file';
+		node.style.display = 'none';
+		node.accept = _List_toArray(mimes).join(',');
+		document.body.appendChild(node);
+		node.addEventListener('change', function(event)
 		{
 			callback(_Scheduler_succeed(event.target.files[0]));
+			document.body.removeChild(node);
 		});
-		_File_click(_File_node);
+		_File_click(node);
 	});
 }
 
@@ -226,6 +236,15 @@ function uploadOne(mimes)
  * configures accepted MIME types, and triggers a click to open the
  * browser's file picker. Resolves with a tuple of (first file, rest)
  * to guarantee at least one file is selected.
+ *
+ * The FileList is converted to a plain Array before passing to
+ * _List_fromArray because FileList is not a true Array and some
+ * browsers (notably older iOS Safari) do not support iterating it
+ * as one.
+ *
+ * The input element is appended to the document body while the dialog
+ * is open because iOS Safari ignores programmatic clicks on detached
+ * file inputs.
  * @canopy-type List String -> a
  * @name uploadOneOrMore
  * @param {Object} mimes - A Canopy List of MIME type strings
@@ -235,16 +254,20 @@ function uploadOneOrMore(mimes)
 {
 	return _Scheduler_binding(function(callback)
 	{
-		_File_node = document.createElement('input');
-		_File_node.type = 'file';
-		_File_node.multiple = true;
-		_File_node.accept = _List_toArray(mimes).join(',');
-		_File_node.addEventListener('change', function(event)
+		var node = document.createElement('input');
+		node.type = 'file';
+		node.multiple = true;
+		node.style.display = 'none';
+		node.accept = _List_toArray(mimes).join(',');
+		document.body.appendChild(node);
+		node.addEventListener('change', function(event)
 		{
-			var canopyFiles = _List_fromArray(event.target.files);
+			var filesArray = Array.prototype.slice.call(event.target.files);
+			var canopyFiles = _List_fromArray(filesArray);
 			callback(_Scheduler_succeed(_Utils_Tuple2(canopyFiles.a, canopyFiles.b)));
+			document.body.removeChild(node);
 		});
-		_File_click(_File_node);
+		_File_click(node);
 	});
 }
 
@@ -265,8 +288,13 @@ function toString(blob)
 	return _Scheduler_binding(function(callback)
 	{
 		var reader = new FileReader();
+		reader.addEventListener('error', function() {
+			callback(_Scheduler_fail(reader.error ? reader.error.message : 'File read failed'));
+		});
 		reader.addEventListener('loadend', function() {
-			callback(_Scheduler_succeed(reader.result));
+			if (!reader.error) {
+				callback(_Scheduler_succeed(reader.result));
+			}
 		});
 		reader.readAsText(blob);
 		return function() { reader.abort(); };
@@ -288,8 +316,13 @@ function toBytes(blob)
 	return _Scheduler_binding(function(callback)
 	{
 		var reader = new FileReader();
+		reader.addEventListener('error', function() {
+			callback(_Scheduler_fail(reader.error ? reader.error.message : 'File read failed'));
+		});
 		reader.addEventListener('loadend', function() {
-			callback(_Scheduler_succeed(new DataView(reader.result)));
+			if (!reader.error) {
+				callback(_Scheduler_succeed(new DataView(reader.result)));
+			}
 		});
 		reader.readAsArrayBuffer(blob);
 		return function() { reader.abort(); };
@@ -312,8 +345,13 @@ function toUrl(blob)
 	return _Scheduler_binding(function(callback)
 	{
 		var reader = new FileReader();
+		reader.addEventListener('error', function() {
+			callback(_Scheduler_fail(reader.error ? reader.error.message : 'File read failed'));
+		});
 		reader.addEventListener('loadend', function() {
-			callback(_Scheduler_succeed(reader.result));
+			if (!reader.error) {
+				callback(_Scheduler_succeed(reader.result));
+			}
 		});
 		reader.readAsDataURL(blob);
 		return function() { reader.abort(); };
