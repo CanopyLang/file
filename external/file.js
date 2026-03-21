@@ -221,12 +221,52 @@ function uploadOne(mimes)
 		node.style.display = 'none';
 		node.accept = _List_toArray(mimes).join(',');
 		document.body.appendChild(node);
+
+		var resolved = false;
+
+		function cleanup()
+		{
+			window.removeEventListener('focus', onWindowFocus);
+			if (node.parentNode)
+			{
+				document.body.removeChild(node);
+			}
+		}
+
 		node.addEventListener('change', function(event)
 		{
+			if (resolved) { return; }
+			resolved = true;
+			cleanup();
 			callback(_Scheduler_succeed(event.target.files[0]));
-			document.body.removeChild(node);
 		});
+
+		// Detect picker cancellation: when the window regains focus without a
+		// `change` event firing, the user dismissed the dialog without selecting
+		// a file. We wait a short tick after focus returns (giving `change` a
+		// chance to arrive first) before treating it as a cancel.
+		function onWindowFocus()
+		{
+			setTimeout(function()
+			{
+				if (!resolved)
+				{
+					resolved = true;
+					cleanup();
+					// Task hangs by design on cancel (same as Elm's File.Select).
+					// DOM is now cleaned up so there is no resource leak.
+				}
+			}, 300);
+		}
+
+		// Attach the focus listener after a short delay so it does not fire
+		// immediately if the picker opens synchronously.
+		setTimeout(function() { window.addEventListener('focus', onWindowFocus); }, 100);
+
 		_File_click(node);
+
+		// Return cancellation cleanup for Task.kill
+		return function() { resolved = true; cleanup(); };
 	});
 }
 
@@ -260,14 +300,45 @@ function uploadOneOrMore(mimes)
 		node.style.display = 'none';
 		node.accept = _List_toArray(mimes).join(',');
 		document.body.appendChild(node);
+
+		var resolved = false;
+
+		function cleanup()
+		{
+			window.removeEventListener('focus', onWindowFocus);
+			if (node.parentNode)
+			{
+				document.body.removeChild(node);
+			}
+		}
+
 		node.addEventListener('change', function(event)
 		{
+			if (resolved) { return; }
+			resolved = true;
+			cleanup();
 			var filesArray = Array.prototype.slice.call(event.target.files);
 			var canopyFiles = _List_fromArray(filesArray);
 			callback(_Scheduler_succeed(_Utils_Tuple2(canopyFiles.a, canopyFiles.b)));
-			document.body.removeChild(node);
 		});
+
+		function onWindowFocus()
+		{
+			setTimeout(function()
+			{
+				if (!resolved)
+				{
+					resolved = true;
+					cleanup();
+				}
+			}, 300);
+		}
+
+		setTimeout(function() { window.addEventListener('focus', onWindowFocus); }, 100);
+
 		_File_click(node);
+
+		return function() { resolved = true; cleanup(); };
 	});
 }
 
