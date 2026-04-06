@@ -1,0 +1,65 @@
+module FileBrowser exposing (main)
+
+{-| Browser integration tests for the File package. These tests run in a
+real browser environment where the File constructor is available, allowing
+us to test metadata accessors, content reading tasks, and the decoder
+with actual File objects.
+-}
+
+import Bytes
+import File
+import FileTestHelper exposing (createTestFile)
+import String
+import Task
+import Time
+import Test exposing (BrowserTest, Test, describe, test, asyncTest, inBrowser)
+import Expect
+
+
+main : BrowserTest
+main =
+    inBrowser
+        [ metadataTests
+        , contentTests
+        ]
+
+
+metadataTests : Test
+metadataTests =
+    describe "File metadata"
+        [ test "File.name returns correct name" <| \_ ->
+            Expect.equal (File.name testFile) "test.txt"
+        , test "File.mime returns correct MIME type" <| \_ ->
+            Expect.equal (File.mime testFile) "text/plain"
+        , test "File.size returns correct size" <| \_ ->
+            Expect.equal (File.size testFile) 5
+        , test "File.lastModified returns correct time" <| \_ ->
+            Expect.equal (Time.posixToMillis (File.lastModified testFile)) 1704067200000
+        ]
+
+
+contentTests : Test
+contentTests =
+    describe "File content"
+        [ asyncTest "File.toString reads text content"
+            (File.toString testFile
+                |> Task.map (\content ->
+                    Expect.equal content "hello"))
+        , asyncTest "File.toUrl produces data URL"
+            (File.toUrl testFile
+                |> Task.map (\url ->
+                    Expect.true "URL starts with data:"
+                        (String.startsWith "data:" url)))
+        , asyncTest "File.toBytes reads bytes with correct width"
+            (File.toBytes testFile
+                |> Task.map (\bytes ->
+                    Expect.equal (Bytes.width bytes) 5))
+        ]
+
+
+{-| A reusable test File with known metadata: name "test.txt", content "hello"
+(5 bytes), MIME type "text/plain", lastModified 2024-01-01T00:00:00Z.
+-}
+testFile : File.File
+testFile =
+    createTestFile "test.txt" "hello" "text/plain"

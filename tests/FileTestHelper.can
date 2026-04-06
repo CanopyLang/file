@@ -1,0 +1,19 @@
+module FileTestHelper exposing (createTestFile)
+
+{-| Helpers for browser integration tests that construct real File objects.
+These allow testing File metadata and content reading APIs without
+requiring user interaction with file picker dialogs.
+-}
+
+import File exposing (File)
+
+foreign import javascript "external/file-test-helper.js" as FileTestHelperFFI
+
+
+{-| Create a test File with the given name, text content, and MIME type.
+The file's lastModified timestamp is fixed at 2024-01-01T00:00:00Z
+(1704067200000 milliseconds since epoch) for deterministic assertions.
+-}
+createTestFile : String -> String -> String -> File
+createTestFile name content mimeType =
+    FileTestHelperFFI.createTestFile name content mimeType

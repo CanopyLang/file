@@ -5,6 +5,7 @@ import File exposing (File)
 import Test exposing (..)
 import Expect
 import Json.Decode as Decode
+import String
 
 
 main : Test
@@ -16,6 +17,7 @@ tests : Test
 tests =
     describe "File Tests"
         [ decoderTests
+        , decoderEdgeCaseTests
         ]
 
 
@@ -33,34 +35,165 @@ decoderTests =
                 case Decode.decodeString File.decoder "\"hello\"" of
                     Ok _ ->
                         Expect.fail "Expected Err"
-                    Err _ ->
-                        Expect.pass
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
         , test "rejects number" <|
             \() ->
                 case Decode.decodeString File.decoder "42" of
                     Ok _ ->
                         Expect.fail "Expected Err"
-                    Err _ ->
-                        Expect.pass
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
         , test "rejects null" <|
             \() ->
                 case Decode.decodeString File.decoder "null" of
                     Ok _ ->
                         Expect.fail "Expected Err"
-                    Err _ ->
-                        Expect.pass
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
         , test "rejects boolean" <|
             \() ->
                 case Decode.decodeString File.decoder "true" of
                     Ok _ ->
                         Expect.fail "Expected Err"
-                    Err _ ->
-                        Expect.pass
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
         , test "rejects object" <|
             \() ->
                 case Decode.decodeString File.decoder "{}" of
                     Ok _ ->
                         Expect.fail "Expected Err"
-                    Err _ ->
-                        Expect.pass
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        ]
+
+
+decoderEdgeCaseTests : Test
+decoderEdgeCaseTests =
+    describe "File.decoder edge cases"
+        [ test "rejects array" <|
+            \() ->
+                case Decode.decodeString File.decoder "[]" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects non-empty array" <|
+            \() ->
+                case Decode.decodeString File.decoder "[1,2,3]" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects nested object" <|
+            \() ->
+                case Decode.decodeString File.decoder "{\"name\":\"test.txt\",\"size\":100}" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects false boolean" <|
+            \() ->
+                case Decode.decodeString File.decoder "false" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects zero" <|
+            \() ->
+                case Decode.decodeString File.decoder "0" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects negative number" <|
+            \() ->
+                case Decode.decodeString File.decoder "-1" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects float" <|
+            \() ->
+                case Decode.decodeString File.decoder "3.14" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects empty string" <|
+            \() ->
+                case Decode.decodeString File.decoder "\"\"" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects object with file-like fields" <|
+            \() ->
+                case Decode.decodeString File.decoder "{\"name\":\"photo.jpg\",\"type\":\"image/jpeg\",\"size\":1024,\"lastModified\":1234567890}" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects deeply nested object" <|
+            \() ->
+                case Decode.decodeString File.decoder "{\"a\":{\"b\":{\"c\":1}}}" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects array of objects" <|
+            \() ->
+                case Decode.decodeString File.decoder "[{\"name\":\"a.txt\"}]" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects very large number" <|
+            \() ->
+                case Decode.decodeString File.decoder "9999999999999999" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects string with special characters" <|
+            \() ->
+                case Decode.decodeString File.decoder "\"file with spaces & (special).txt\"" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects string that looks like a MIME type" <|
+            \() ->
+                case Decode.decodeString File.decoder "\"application/octet-stream\"" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
+        , test "rejects string that looks like a data URL" <|
+            \() ->
+                case Decode.decodeString File.decoder "\"data:text/plain;base64,aGVsbG8=\"" of
+                    Ok _ ->
+                        Expect.fail "Expected Err"
+                    Err err ->
+                        Expect.true "error mentions FILE"
+                            (String.contains "FILE" (Decode.errorToString err))
         ]
